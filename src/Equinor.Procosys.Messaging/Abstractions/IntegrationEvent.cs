@@ -2,7 +2,7 @@
 
 namespace Equinor.Procosys.Messaging.Abstractions
 {
-    public class IntegrationEvent
+    public abstract class IntegrationEvent
     {
         public IntegrationEvent()
         {
