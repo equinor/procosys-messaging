@@ -13,7 +13,6 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
     public class AzureServiceBusQueueClient : AzureServiceBusBase
     {
         private readonly IQueueClient _queueClient;
-        private readonly IScopeFactory _scopeFactory;
 
         public AzureServiceBusQueueClient(
             IQueueClient queueClient,
@@ -22,10 +21,9 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
             IEventBusSubscriptionsManager subsManager,
             IScopeFactory scopeFactory,
             ILogger<AzureServiceBusQueueClient> logger)
-            : base(subsManager, encoding, logger)
+            : base(subsManager, scopeFactory, encoding, logger)
         {
             _queueClient = queueClient;
-            _scopeFactory = scopeFactory;
 
             RegisterSubscriptionClientMessageHandler(maxConcurrentCalls);
         }
@@ -81,28 +79,6 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
                     }
                 },
                 new MessageHandlerOptions(ExceptionReceivedHandler) { MaxConcurrentCalls = maxConcurrentCalls, AutoComplete = false });
-        }
-
-        private async Task<bool> ProcessEvent(string eventName, string message)
-        {
-            var processed = false;
-            if (_subsManager.HasSubscriptionsForEvent(eventName))
-            {
-                using (var scope = _scopeFactory.CreateScope())
-                {
-                    var subscriptions = _subsManager.GetHandlersForEvent(eventName);
-                    foreach (var subscription in subscriptions)
-                    {
-                        var handler = scope.GetHandler(subscription.HandlerType);
-                        if (handler == null) continue;
-                        var eventType = _subsManager.GetEventTypeByName(eventName);
-                        var integrationEvent = JsonSerializer.Deserialize(message, eventType) as IntegrationEvent;
-                        await handler.HandleAsync(integrationEvent);
-                    }
-                }
-                processed = true;
-            }
-            return processed;
         }
 
         public override Task SubscribeAsync<T, TH>()
