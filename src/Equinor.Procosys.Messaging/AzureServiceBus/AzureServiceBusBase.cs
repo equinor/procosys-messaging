@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Equinor.Procosys.Messaging.Abstractions;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Equinor.Procosys.Messaging.AzureServiceBus
 {
@@ -14,7 +14,7 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
         protected readonly Encoding _encoding;
         protected readonly ILogger _logger;
 
-        public AzureServiceBusBase(
+        protected AzureServiceBusBase(
             IEventBusSubscriptionsManager subsManager,
             IScopeFactory scopeFactory,
             Encoding encoding,
@@ -50,9 +50,9 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
                         var handler = scope.GetHandler(subscription.HandlerType);
                         if (handler == null) continue;
                         var eventType = _subsManager.GetEventTypeByName(eventName);
-                        var integrationEvent = JsonSerializer.Deserialize(message, eventType) as IntegrationEvent;
+                        var integrationEvent = JsonConvert.DeserializeObject(message, eventType) as IntegrationEvent;
                         var concreteType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
-                        await (Task)concreteType.GetMethod("Handle").Invoke(handler, new object[] { integrationEvent });
+                        await (Task)concreteType.GetMethod(nameof(IIntegrationEventHandler<IntegrationEvent>.HandleAsync)).Invoke(handler, new object[] { integrationEvent });
                     }
                 }
                 processed = true;
