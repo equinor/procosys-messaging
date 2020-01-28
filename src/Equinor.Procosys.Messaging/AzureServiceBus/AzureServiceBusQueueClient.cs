@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Equinor.Procosys.Messaging.Abstractions;
 using Microsoft.Azure.ServiceBus;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Equinor.Procosys.Messaging.AzureServiceBus
 {
@@ -31,7 +31,7 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
         public override Task Publish(IntegrationEvent @event)
         {
             var eventName = @event.GetType().Name;
-            var jsonMessage = JsonSerializer.Serialize(@event);
+            var jsonMessage = JsonConvert.SerializeObject(@event);
             var body = _encoding.GetBytes(jsonMessage);
 
             var message = new Message
@@ -47,7 +47,7 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
         public override Task Publish(IEnumerable<IntegrationEvent> events)
         {
             var messages = events.Select(@event =>
-                new Message(_encoding.GetBytes(JsonSerializer.Serialize(@event))))
+                new Message(_encoding.GetBytes(JsonConvert.SerializeObject(@event))))
                 .ToList();
 
             return _queueClient.SendAsync(messages);
