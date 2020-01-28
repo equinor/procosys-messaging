@@ -10,37 +10,31 @@ using Microsoft.Extensions.Logging;
 
 namespace Equinor.Procosys.Messaging.AzureServiceBus
 {
-    public class AzureServiceBus : IEventBus
+    public class AzureServiceBusTopicClient : AzureServiceBusBase
     {
-        private readonly IAzureServiceBusPersistentConnection _serviceBusPersistentConnection;
-        private readonly IEventBusSubscriptionsManager _subsManager;
-        private readonly Encoding _encoding;
-        private readonly ILogger<AzureServiceBus> _logger;
+        private readonly ITopicClient _topicClient;
         private readonly IScopeFactory _scopeFactory;
-        private readonly SubscriptionClient _subscriptionClient;
+        private readonly ISubscriptionClient _subscriptionClient;
 
-        public AzureServiceBus(
-            IAzureServiceBusPersistentConnection serviceBusPersistentConnection,
-            IEventBusSubscriptionsManager subsManager,
-            string subscriptionClientName,
+        public AzureServiceBusTopicClient(
+            ITopicClient topicClient,
             int maxConcurrentCalls,
             Encoding encoding,
+            ISubscriptionClient subscriptionClient,
+            IEventBusSubscriptionsManager subsManager,
             IScopeFactory scopeFactory,
-            ILogger<AzureServiceBus> logger)
+            ILogger<AzureServiceBusTopicClient> logger)
+            : base(subsManager, encoding, logger)
         {
-            _serviceBusPersistentConnection = serviceBusPersistentConnection;
-            _subsManager = subsManager;
-            _encoding = encoding;
+            _topicClient = topicClient;
+            _subscriptionClient = subscriptionClient;
             _scopeFactory = scopeFactory;
-            _logger = logger;
-
-            _subscriptionClient = new SubscriptionClient(serviceBusPersistentConnection.ServiceBusConnectionStringBuilder, subscriptionClientName);
 
             RemoveDefaultRule();
             RegisterSubscriptionClientMessageHandler(maxConcurrentCalls);
         }
 
-        public Task Publish(IntegrationEvent @event)
+        public override Task Publish(IntegrationEvent @event)
         {
             var eventName = @event.GetType().Name;
             var jsonMessage = JsonSerializer.Serialize(@event);
@@ -53,25 +47,19 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
                 Label = eventName
             };
 
-            var topicClient = _serviceBusPersistentConnection.CreateModel();
-
-            return topicClient.SendAsync(message);
+            return _topicClient.SendAsync(message);
         }
 
-        public Task Publish(IEnumerable<IntegrationEvent> events)
+        public override Task Publish(IEnumerable<IntegrationEvent> events)
         {
             var messages = events.Select(@event =>
                 new Message(_encoding.GetBytes(JsonSerializer.Serialize(@event))))
                 .ToList();
 
-            var topicClient = _serviceBusPersistentConnection.CreateModel();
-
-            return topicClient.SendAsync(messages);
+            return _topicClient.SendAsync(messages);
         }
 
-        public async Task SubscribeAsync<T, TH>()
-            where T : IntegrationEvent
-            where TH : IIntegrationEventHandler<T>
+        public override async Task SubscribeAsync<T, TH>()
         {
             var eventName = typeof(T).Name;
 
@@ -97,9 +85,7 @@ namespace Equinor.Procosys.Messaging.AzureServiceBus
             _subsManager.AddSubscription<T, TH>();
         }
 
-        public async Task Unsubscribe<T, TH>()
-            where T : IntegrationEvent
-            where TH : IIntegrationEventHandler<T>
+        public override async Task Unsubscribe<T, TH>()
         {
             var eventName = typeof(T).Name;
 
